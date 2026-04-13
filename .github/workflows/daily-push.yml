@@ -1,65 +1,29 @@
-name: 每日推送 follow-builders 到飞书
+name: Daily AI UIUX News
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  send:
+  send-news:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 拉取资讯源仓库
+      - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          repository: zarazhangrui/follow-builders
-          fetch-depth: 1
 
-      - name: 推送到飞书
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Send free rules-based digest
+        run: npm start
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-        run: |
-          python3 <<'PY'
-          import json
-          import os
-          import sys
-          import urllib.error
-          import urllib.request
-
-          webhook = os.environ.get("FEISHU_WEBHOOK", "").strip()
-          if not webhook:
-              print("FEISHU_WEBHOOK is empty. Add it in Settings > Secrets and variables > Actions.")
-              sys.exit(1)
-
-          with open("README.md", "r", encoding="utf-8", errors="ignore") as f:
-              content = f.read()[:2500]
-
-          text = "AI UIUX日报\n\n" + content + "\n\n来源：https://github.com/zarazhangrui/follow-builders"
-
-          payload = {
-              "msg_type": "text",
-              "content": {
-                  "text": text
-              }
-          }
-
-          data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-          req = urllib.request.Request(
-              webhook,
-              data=data,
-              headers={"Content-Type": "application/json"},
-              method="POST",
-          )
-
-          try:
-              with urllib.request.urlopen(req, timeout=20) as resp:
-                  body = resp.read().decode("utf-8", errors="ignore")
-                  print(body)
-          except urllib.error.HTTPError as e:
-              print(e.read().decode("utf-8", errors="ignore"))
-              sys.exit(1)
-          PY
+          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+          USE_OPENAI: "0"
