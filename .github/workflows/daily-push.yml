@@ -1,8 +1,8 @@
 name: 每日推送follow-builders到飞书
 on:
   schedule:
-    - cron: '0 1 * * *'  # 北京时间每天 9:00 发送
-  workflow_dispatch:      # 允许手动测试
+    - cron: '0 1 * * *'
+  workflow_dispatch:
 
 jobs:
   send:
@@ -18,9 +18,7 @@ jobs:
         id: info
         run: |
           content=$(cat README.md | head -c 1500)
-          # 修正点：正确的换行转义写法是 $'\n'，而非 '/\n/'
           content="${content//$'\n'/\\n}"
-          # 修正点：转义双引号只需一次转义
           content="${content//\"/\\\"}"
           echo "content=$content" >> $GITHUB_OUTPUT
 
@@ -33,8 +31,7 @@ jobs:
             -d '{
               "msg_type": "markdown",
               "content": {
-                "title": "📅 每日开发者资讯",
-                "text": "${{ steps.info.outputs.content }}\n\n👉 来源：https://github.com/zarazhangrui/follow-builders"
+                "title": "AI UIUX日报",
+                "text": "AI UIUX日报\n${{ steps.info.outputs.content }}\n\n来源：https://github.com/zarazhangrui/follow-builders"
               }
             }' "$WEBHOOK"
-          
