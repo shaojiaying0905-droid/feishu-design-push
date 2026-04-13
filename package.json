@@ -1,0 +1,14 @@
+{
+  "name": "ai-design-news-feishu",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node daily.js",
+    "test:dry-run": "DRY_RUN=1 node daily.js",
+    "test:feishu": "MOCK_DIGEST=1 node daily.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
