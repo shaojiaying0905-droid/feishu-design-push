@@ -1,37 +1,71 @@
-name: 每日推送follow-builders到飞书
+name: 每日推送 follow-builders 到飞书
+
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 9 * * *'
+      timezone: "Asia/Shanghai"
   workflow_dispatch:
+
+concurrency:
+  group: daily-feishu-push
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   send:
     runs-on: ubuntu-latest
+
     steps:
-      - name: 拉取仓库内容
+      - name: 拉取资讯源仓库
         uses: actions/checkout@v4
         with:
           repository: zarazhangrui/follow-builders
           fetch-depth: 1
 
-      - name: 读取最新资讯
-        id: info
+      - name: 检查飞书 Webhook
+        env:
+          WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
-          content=$(cat README.md | head -c 1500)
-          content="${content//$'\n'/\\n}"
-          content="${content//\"/\\\"}"
-          echo "content=$content" >> $GITHUB_OUTPUT
+          if [ -z "$WEBHOOK" ]; then
+            echo "FEISHU_WEBHOOK is empty. Please add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
 
       - name: 推送到飞书
         env:
           WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{
-              "msg_type": "markdown",
-              "content": {
-                "title": "AI UIUX日报",
-                "text": "AI UIUX日报\n${{ steps.info.outputs.content }}\n\n来源：https://github.com/zarazhangrui/follow-builders"
+          content="$(head -c 2500 README.md)"
+
+          payload="$(jq -n \
+            --arg title "AI UIUX日报" \
+            --arg text "AI UIUX日报
+
+${content}
+
+来源：https://github.com/zarazhangrui/follow-builders" \
+            '{
+              msg_type: "interactive",
+              card: {
+                header: {
+                  title: {
+                    tag: "plain_text",
+                    content: $title
+                  }
+                },
+                elements: [
+                  {
+                    tag: "markdown",
+                    content: $text
+                  }
+                ]
               }
-            }' "$WEBHOOK"
+            }')"
+
+          curl --fail-with-body --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$WEBHOOK"
