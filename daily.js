@@ -117,6 +117,16 @@ function trimText(text, maxLength) {
   return `${normalized.slice(0, maxLength)}...`;
 }
 
+function escapeLarkMarkdown(text) {
+  return String(text || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\*/g, "\\*")
+    .replace(/_/g, "\\_")
+    .replace(/`/g, "\\`")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
+
 function keywordScore(item) {
   const text = `${item.title} ${item.text}`.toLowerCase();
   return IMPORTANT_KEYWORDS.reduce((score, keyword) => {
@@ -180,26 +190,108 @@ function flattenFeeds(feeds) {
     .slice(0, 35);
 }
 
-function whyForDesigner(item) {
+function topicLabel(item) {
   const text = `${item.title} ${item.text}`.toLowerCase();
 
   if (text.includes("figma") || text.includes("prototype") || text.includes("design")) {
-    return "和设计工具、原型或设计流程相关，适合关注 AI 如何进入设计生产链路。";
+    return "设计工具";
   }
 
   if (text.includes("agent") || text.includes("智能体")) {
-    return "和 Agent 产品体验相关，值得观察任务编排、人机协作和自动化界面的变化。";
+    return "Agent 体验";
   }
 
   if (text.includes("multimodal") || text.includes("voice") || text.includes("多模态")) {
-    return "和多模态交互相关，可能影响未来 AI 产品的信息输入、反馈和可用性设计。";
+    return "多模态交互";
   }
 
   if (text.includes("product") || text.includes("workflow") || text.includes("产品") || text.includes("工作流")) {
-    return "和 AI 产品形态或工作流变化相关，适合产品与体验设计团队跟进。";
+    return "产品工作流";
   }
 
-  return "来自 AI builders 的近期动态，可作为观察 AI 产品和设计趋势的线索。";
+  return "AI 产品观察";
+}
+
+function authorName(item) {
+  return String(item.author || "AI builder")
+    .replace(/\s*\(@[^)]+\)\s*$/, "")
+    .trim();
+}
+
+function displayTitle(item, index) {
+  const topic = topicLabel(item);
+  const author = authorName(item);
+
+  if (item.source === "Podcast") {
+    return `${topic}｜${author} 新一期值得扫一眼`;
+  }
+
+  if (item.source === "Blog") {
+    return `${topic}｜${author} 官方更新`;
+  }
+
+  const titleTemplates = [
+    `${topic}｜${author} 的一条近期观察`,
+    `${topic}｜来自 ${author} 的产品信号`,
+    `${topic}｜${author} 提到的新变化`,
+    `${topic}｜今天值得留意的一条动态`,
+    `${topic}｜${author} 的实践线索`,
+    `${topic}｜可能影响体验设计的信号`
+  ];
+
+  return titleTemplates[index % titleTemplates.length];
+}
+
+function excerptForItem(item) {
+  const excerpt = item.title || item.text || "";
+  return trimText(excerpt, 110);
+}
+
+function whyForDesigner(item, index) {
+  const text = `${item.title} ${item.text}`.toLowerCase();
+  const source = item.source || "来源";
+  const author = item.author || "AI builder";
+
+  if (text.includes("figma")) {
+    return `${authorName(item)} 提到 Figma/设计工具相关变化，适合作为团队评估 AI 进入设计生产链路的观察点。`;
+  }
+
+  if (text.includes("prototype") || text.includes("design")) {
+    return `${source} 里出现设计、原型或界面语境，值得看它是否会改变从想法到可交互方案的路径。`;
+  }
+
+  if (text.includes("agent") || text.includes("智能体")) {
+    const agentReasons = [
+      `这条和 Agent 有关，重点不只是技术能力，而是任务如何被拆解、确认、交接和反馈。`,
+      `它适合从体验设计角度看：Agent 是在替人执行任务，还是在增加新的确认和管理成本。`,
+      `可以拿它观察 Agent 产品的关键问题：用户怎么交代目标、怎么纠错、怎么信任结果。`
+    ];
+    return agentReasons[index % agentReasons.length];
+  }
+
+  if (text.includes("multimodal") || text.includes("voice") || text.includes("多模态")) {
+    const multimodalReasons = [
+      `多模态会改变输入和反馈方式，适合关注语音、图像、文本混合场景下的交互边界。`,
+      `这类变化会影响用户如何表达意图，也会影响设计师定义状态、反馈和错误恢复。`
+    ];
+    return multimodalReasons[index % multimodalReasons.length];
+  }
+
+  if (text.includes("workflow") || text.includes("工作流")) {
+    return `它指向工作流变化，适合思考哪些重复设计/产品动作会被 AI 接管，哪些仍要人来判断。`;
+  }
+
+  if (text.includes("product") || text.includes("产品")) {
+    return `这条更偏产品形态观察，可以帮助判断 AI 功能是独立工具，还是会嵌入现有使用路径。`;
+  }
+
+  const fallbackReasons = [
+    `来自 ${author} 的近期动态，可作为今天观察 AI 产品方向的线索。`,
+    `这条信息不一定直接是 UI 话题，但能帮助判断 AI 产品叙事正在往哪里走。`,
+    `适合快速扫一眼，看看是否会影响设计团队接下来要关注的能力边界。`
+  ];
+
+  return fallbackReasons[index % fallbackReasons.length];
 }
 
 function formatItemDate(value) {
@@ -216,24 +308,71 @@ function formatItemDate(value) {
 
 function buildFreeDigest(items) {
   const selected = items.slice(0, 6);
-  const lines = [
-    `AI设计资讯日报｜${shanghaiDate()}｜AI UIUX日报`,
-    "",
-    "今天使用免费规则版自动筛选 follow-builders 内容源：不调用付费大模型，只推送最可能和 AI 产品设计、UX/UI、多模态、Agent 体验相关的线索。",
-    ""
+  const elements = [
+    {
+      tag: "div",
+      text: {
+        tag: "lark_md",
+        content: "AI UIUX日报\n\n今天自动筛选 follow-builders 内容源，优先推送和 **AI 产品设计、UX/UI、多模态、Agent 体验** 相关的线索。"
+      }
+    },
+    {
+      tag: "hr"
+    }
   ];
 
   selected.forEach((item, index) => {
-    lines.push(`${index + 1}. ${item.title || "未命名内容"}`);
-    lines.push(`来源：${item.source}｜${item.author || "未知"}｜${formatItemDate(item.publishedAt)}`);
-    lines.push(`为什么值得设计师关注：${whyForDesigner(item)}`);
-    lines.push(`原文链接：${item.url || "未提供"}`);
-    lines.push("");
+    const title = escapeLarkMarkdown(displayTitle(item, index));
+    const excerpt = escapeLarkMarkdown(excerptForItem(item));
+    const source = escapeLarkMarkdown(item.source || "来源未知");
+    const author = escapeLarkMarkdown(item.author || "作者未知");
+    const date = escapeLarkMarkdown(formatItemDate(item.publishedAt));
+    const topic = escapeLarkMarkdown(topicLabel(item));
+    const reason = escapeLarkMarkdown(whyForDesigner(item, index));
+    const linkLine = item.url ? `[点击查看](${item.url})` : "原文链接：未提供";
+
+    elements.push({
+      tag: "div",
+      text: {
+        tag: "lark_md",
+        content: `**${index + 1}. ${title}**\n\n${reason}\n\n原文摘录：${excerpt}\n\n${linkLine}\n\n${source} · ${author} · ${date} · ${topic}`
+      }
+    });
+
+    if (index < selected.length - 1) {
+      elements.push({
+        tag: "hr"
+      });
+    }
   });
 
-  lines.push("今日趋势观察：这是免费规则筛选版，优点是不花 OpenAI 额度、能稳定定时推送；缺点是摘要质量不如大模型，会更像资讯线索清单。以后想升级成更像编辑写的日报，再打开 OpenAI 模式即可。");
+  elements.push({
+    tag: "hr"
+  });
+  elements.push({
+    tag: "div",
+    text: {
+      tag: "lark_md",
+      content: "**今日趋势观察**\n\n免费规则版会更像线索卡片：先帮你稳定发现值得看的 AI UIUX 动态；之后如果接入大模型，再升级成更像人工编辑写的深度摘要。"
+    }
+  });
 
-  return lines.join("\n");
+  return {
+    msg_type: "interactive",
+    card: {
+      config: {
+        wide_screen_mode: true
+      },
+      header: {
+        template: "blue",
+        title: {
+          tag: "plain_text",
+          content: `AI UIUX日报｜${shanghaiDate()}`
+        }
+      },
+      elements
+    }
+  };
 }
 
 async function buildDigest(items) {
@@ -308,21 +447,23 @@ function feishuSignature(timestamp, secret) {
   return createHmac("sha256", stringToSign).update("").digest("base64");
 }
 
-async function sendFeishuText(text) {
+async function sendFeishuDigest(digest) {
   if (process.env.DRY_RUN === "1") {
     console.log("[DRY_RUN] Feishu message preview:");
-    console.log(text);
+    console.log(typeof digest === "string" ? digest : JSON.stringify(digest, null, 2));
     return;
   }
 
   const webhook = requiredEnv("FEISHU_WEBHOOK");
   const secret = process.env.FEISHU_SECRET;
-  const payload = {
-    msg_type: "text",
-    content: {
-      text
-    }
-  };
+  const payload = typeof digest === "string"
+    ? {
+        msg_type: "text",
+        content: {
+          text: digest
+        }
+      }
+    : digest;
 
   if (secret) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -382,7 +523,7 @@ async function main() {
   }
 
   console.log("Digest generated.");
-  await sendFeishuText(digest);
+  await sendFeishuDigest(digest);
 }
 
 main().catch((error) => {
