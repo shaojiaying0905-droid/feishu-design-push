@@ -218,33 +218,59 @@ function authorName(item) {
     .trim();
 }
 
+function titleTopicLabel(item) {
+  return topicLabel(item).replace(/\s+/g, "");
+}
+
 function displayTitle(item, index) {
-  const topic = topicLabel(item);
+  const topic = titleTopicLabel(item);
   const author = authorName(item);
 
   if (item.source === "Podcast") {
-    return `${topic}｜${author} 新一期值得扫一眼`;
+    return limitText(`${author} 的播客新内容，值得从 ${topic} 角度快速关注`, 50);
   }
 
   if (item.source === "Blog") {
-    return `${topic}｜${author} 官方更新`;
+    return limitText(`${author} 发布新更新，可能影响 ${topic} 判断`, 50);
   }
 
   const titleTemplates = [
-    `${topic}｜${author} 的一条近期观察`,
-    `${topic}｜来自 ${author} 的产品信号`,
-    `${topic}｜${author} 提到的新变化`,
-    `${topic}｜今天值得留意的一条动态`,
-    `${topic}｜${author} 的实践线索`,
-    `${topic}｜可能影响体验设计的信号`
+    `${author} 分享了关于${topic}的新观察`,
+    `${author} 提到一条值得关注的${topic}信号`,
+    `一条可能影响${topic}判断的新动态`,
+    `${topic} 方向出现新的产品讨论线索`,
+    `${author} 的动态值得从${topic}角度看`,
+    `今天值得留意的${topic}相关变化`
   ];
 
-  return titleTemplates[index % titleTemplates.length];
+  return limitText(titleTemplates[index % titleTemplates.length], 50);
 }
 
 function excerptForItem(item) {
   const excerpt = item.title || item.text || "";
   return trimText(excerpt, 110);
+}
+
+function limitText(text, maxLength) {
+  const normalized = trimText(text, maxLength + 10);
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function detailText(item, index) {
+  const topic = topicLabel(item);
+  const author = authorName(item);
+  const excerpt = excerptForItem(item);
+  const reason = whyForDesigner(item, index);
+
+  const detail = [
+    `${author} 的这条内容与「${topic}」相关。${reason}`,
+    excerpt ? `原文核心线索：${excerpt}` : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return limitText(detail, 200);
 }
 
 function whyForDesigner(item, index) {
@@ -308,52 +334,41 @@ function formatItemDate(value) {
 
 function buildFreeDigest(items) {
   const selected = items.slice(0, 6);
-  const elements = [
-    {
-      tag: "div",
-      text: {
-        tag: "lark_md",
-        content: "AI UIUX日报\n\n今天自动筛选 follow-builders 内容源，优先推送和 **AI 产品设计、UX/UI、多模态、Agent 体验** 相关的线索。"
-      }
-    },
-    {
-      tag: "hr"
-    }
-  ];
+  const elements = [];
 
   selected.forEach((item, index) => {
     const title = escapeLarkMarkdown(displayTitle(item, index));
-    const excerpt = escapeLarkMarkdown(excerptForItem(item));
-    const source = escapeLarkMarkdown(item.source || "来源未知");
-    const author = escapeLarkMarkdown(item.author || "作者未知");
-    const date = escapeLarkMarkdown(formatItemDate(item.publishedAt));
-    const topic = escapeLarkMarkdown(topicLabel(item));
-    const reason = escapeLarkMarkdown(whyForDesigner(item, index));
-    const linkLine = item.url ? `[点击查看](${item.url})` : "原文链接：未提供";
+    const detail = escapeLarkMarkdown(detailText(item, index));
 
     elements.push({
       tag: "div",
       text: {
         tag: "lark_md",
-        content: `**${index + 1}. ${title}**\n\n${reason}\n\n原文摘录：${excerpt}\n\n${linkLine}\n\n${source} · ${author} · ${date} · ${topic}`
+        content: `**${title}**\n\n${detail}`
       }
     });
+
+    if (item.url) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: {
+              tag: "plain_text",
+              content: "点击查看"
+            },
+            url: item.url,
+            type: "primary"
+          }
+        ]
+      });
+    }
 
     if (index < selected.length - 1) {
       elements.push({
         tag: "hr"
       });
-    }
-  });
-
-  elements.push({
-    tag: "hr"
-  });
-  elements.push({
-    tag: "div",
-    text: {
-      tag: "lark_md",
-      content: "**今日趋势观察**\n\n免费规则版会更像线索卡片：先帮你稳定发现值得看的 AI UIUX 动态；之后如果接入大模型，再升级成更像人工编辑写的深度摘要。"
     }
   });
 
