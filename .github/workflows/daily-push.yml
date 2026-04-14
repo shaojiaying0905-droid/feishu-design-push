@@ -2,7 +2,7 @@ name: Daily AI UIUX News
 
 on:
   schedule:
-    - cron: "0 1 * * *"
+    - cron: "13 9 * * *"
   workflow_dispatch:
 
 permissions:
